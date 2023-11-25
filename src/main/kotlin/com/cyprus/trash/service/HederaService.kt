@@ -129,16 +129,20 @@ object HederaService {
         throw Exception("Transaction failed after $MAX_RETRIES attempts")
     }
 
+    data class NftTreasuryInfo(val tokenId: TokenId, val treasuryAccountInfo: AccountInfo)
+
     /**
-     * Creates [numberOfChallengers] NFTs for a challenge.
+     * Creates a batch of non-fungible tokens (NFTs) for a challenge.
      *
-     * @param numberOfChallengers The number of NFTs to create.
+     * @param numberOfChallengers The number of NFTs to create for the challenge.
      * @param challengeName The name of the challenge.
-     * @param challengeSymbol The symbol of the challenge NFTs.
-     * @return An [AccountInfo] object containing the account ID and private key of the created account, or null if the account creation fails.
-     * @throws RuntimeException if failed to create a new account or to create the token.
+     * @param challengeSymbol The symbol of the challenge.
+     * @return An instance of [NftTreasuryInfo] containing the token ID and treasury account information,
+     *         or null if the token creation fails.
+     * @throws RuntimeException if the new account creation fails.
+     * @throws RuntimeException if the token creation fails.
      */
-    fun makeNftsForChallenge(numberOfChallengers: Int, challengeName: String, challengeSymbol: String): AccountInfo? {
+    fun makeNftsForChallenge(numberOfChallengers: Int, challengeName: String, challengeSymbol: String): NftTreasuryInfo? {
         val accountInfo: AccountInfo? = createNewAccount(client)
         if (accountInfo == null) {
             throw RuntimeException("Failed to create new account")
@@ -215,6 +219,99 @@ object HederaService {
             nftsCounter = mintBatchOfNfts(nftsCounter)
         }
 
-        return accountInfo
+        return NftTreasuryInfo(tokenId, accountInfo)
+    }
+
+    /**
+     * Transfers the specified non-fungible token (NFT) from the treasury account to the receiver account.
+     *
+     * @param treasuryAccountInfo The [AccountInfo] object containing the details of the treasury account.
+     * @param receiverAccountInfo The [AccountInfo] object containing the details of the receiver account.
+     * @param tokenId The ID of the NFT to be transferred.
+     * @param serial The serial number of the NFT to be transferred.
+     */
+    fun transferNftToAccount(
+        treasuryAccountInfo: AccountInfo,
+        receiverAccountInfo: AccountInfo,
+        tokenId: TokenId,
+        serial: Long
+    ) {
+        val receiverAccountId: AccountId = receiverAccountInfo.accountId
+        val receiverKey: PrivateKey = receiverAccountInfo.key
+
+        val treasuryId = treasuryAccountInfo.accountId
+        val treasuryKey = treasuryAccountInfo.key
+
+        // Create the associate transaction and sign with Alice's key
+        val associateAliceTx = TokenAssociateTransaction()
+            .setAccountId(receiverAccountId)
+            .setTokenIds(listOf(tokenId))
+            .freezeWith(client)
+            .sign(receiverKey)
+
+
+        // Submit the transaction to a Hedera network
+        val associateAliceTxSubmit = associateAliceTx.execute(client)
+
+
+        // Get the transaction receipt
+        val associateAliceRx = associateAliceTxSubmit.getReceipt(client)
+
+
+        // Confirm the transaction was successful
+        println("NFT association with Alice's account: " + associateAliceRx.status)
+
+
+        // Check the balance before the NFT transfer for the treasury account
+        val balanceCheckTreasury = AccountBalanceQuery().setAccountId(treasuryId)
+            .execute(client)
+        println("Treasury balance: " + balanceCheckTreasury.tokens + "NFTs of ID " + tokenId)
+
+
+        // Check the balance before the NFT transfer for Alice's account
+        val balanceCheckAlice = AccountBalanceQuery().setAccountId(receiverAccountId)
+            .execute(client)
+        println("Alice's balance: " + balanceCheckAlice.tokens + "NFTs of ID " + tokenId)
+
+
+        // Transfer NFT from treasury to Alice
+        // Sign with the treasury key to authorize the transfer
+        val tokenTransferTx = TransferTransaction()
+            .addNftTransfer(NftId(tokenId, serial), treasuryId, receiverAccountId)
+            .freezeWith(client)
+            .sign(treasuryKey)
+
+        val tokenTransferSubmit = tokenTransferTx.execute(client)
+        val tokenTransferRx = tokenTransferSubmit.getReceipt(client)
+
+        println("NFT transfer from Treasury to Alice: " + tokenTransferRx.status)
+
+
+        // Check the balance for the treasury account after the transfer
+        val balanceCheckTreasury2 = AccountBalanceQuery().setAccountId(treasuryId)
+            .execute(client)
+        println("Treasury balance: " + balanceCheckTreasury2.tokens + "NFTs of ID " + tokenId)
+
+
+        // Check the balance for Alice's account after the transfer
+        val balanceCheckAlice2 = AccountBalanceQuery().setAccountId(receiverAccountId)
+            .execute(client)
+        println("Alice's balance: " + balanceCheckAlice2.tokens + "NFTs of ID " + tokenId)
+    }
+
+    /**
+     * Distributes non-fungible tokens (NFTs) to a list of challengers.
+     *
+     * @param challengeName The name of the challenge.
+     * @param challengeSymbol The symbol of the challenge.
+     * @param challengers The list of [AccountInfo] objects representing the challengers to whom the NFTs will be distributed.
+     */
+    fun distributeNftsToChallengers(challengeName: String, challengeSymbol: String, challengers: List<AccountInfo>) {
+        val treasuryNftInfo = makeNftsForChallenge(challengers.size, challengeName, challengeSymbol) ?: return
+        for (challenger in challengers.withIndex()) {
+            transferNftToAccount(treasuryNftInfo.treasuryAccountInfo, challenger.value, treasuryNftInfo.tokenId, (challenger.index + 1).toLong())
+            println("-------------------------")
+            println()
+        }
     }
 }
