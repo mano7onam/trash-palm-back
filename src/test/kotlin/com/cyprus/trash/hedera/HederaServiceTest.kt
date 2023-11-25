@@ -103,7 +103,7 @@ class HederaServiceTest {
     }
 
     @Test
-    fun `test transfer`(): Unit = runBlocking {
+    fun `test transfer 1`(): Unit = runBlocking {
         val account1 = HederaService().createNewAccount(10)
         assert(account1 != null)
         val account2 = HederaService().createNewAccount(10)
@@ -115,5 +115,38 @@ class HederaServiceTest {
 
         HederaService().deleteAccount(account1)
         HederaService().deleteAccount(account2)
+    }
+
+    @Test
+    fun `test transfer 2`(): Unit = runBlocking {
+        val account1 = HederaService().createNewAccount(10)
+        assert(account1 != null)
+        val account2 = HederaService().createNewAccount(10)
+        assert(account2 != null)
+        val account3 = HederaService().createNewAccount(10)
+        assert(account3 != null)
+
+        HederaService().transferHBARs(account1!!, account2!!, 2L)
+        assert(HederaService().getAccountBalance(account2) == 12L)
+        assert(HederaService().getAccountBalance(account1) == 8L)
+
+        HederaService().transferHBARs(account2, account3!!, 5L)
+        assert(HederaService().getAccountBalance(account2) == 7L)
+        assert(HederaService().getAccountBalance(account3) == 15L)
+
+        HederaService().transferHBARs(account3, account1, 10L)
+        assert(HederaService().getAccountBalance(account3) == 5L)
+        assert(HederaService().getAccountBalance(account1) == 18L)
+
+        assertThrows<ReceiptStatusException> {
+            HederaService().transferHBARs(account2, account1, 8L)
+        }
+        assert(HederaService().getAccountBalance(account1) == 18L)
+        assert(HederaService().getAccountBalance(account2) == 7L)
+        assert(HederaService().getAccountBalance(account3) == 5L)
+
+        HederaService().deleteAccount(account1)
+        HederaService().deleteAccount(account2)
+        HederaService().deleteAccount(account3)
     }
 }
