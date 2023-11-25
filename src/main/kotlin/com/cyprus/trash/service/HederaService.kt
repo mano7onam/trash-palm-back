@@ -23,7 +23,16 @@ class HederaService {
         return client
     }
 
-    data class AccountInfo(val accountId: AccountId, val key: PrivateKey)
+    data class AccountInfo(val accountId: AccountId, val key: PrivateKey) {
+        companion object {
+            fun fromTransactionable(transactionable: Transactionable): AccountInfo {
+                return AccountInfo(
+                    AccountId.fromString(transactionable.cryptoId),
+                    PrivateKey.fromString(transactionable.cryptoPrivateKey)
+                )
+            }
+        }
+    }
 
     enum class TransactionResult { Ok, Error }
 
@@ -171,41 +180,6 @@ class HederaService {
             .status
     }
 
-    /**
-     * Executes a transaction with a given key and returns the transaction receipt.
-     * If the execution fails due to a BUSY status, the method will retry up to 5 times.
-     * If the execution fails after the maximum number of retries, an exception will be thrown.
-     *
-     * @param transaction The transaction to execute.
-     * @param key The private key to sign the transaction.
-     * @return The transaction receipt.
-     * @throws Exception if the execution fails after the maximum number of retries or any other unexpected error occurs.
-     */
-    @Throws(Exception::class)
-    private fun executeTransaction(transaction: Transaction<*>, key: PrivateKey): TransactionReceipt {
-        val MAX_RETRIES = 5
-
-        var retries = 0
-
-        while (retries < MAX_RETRIES) {
-            try {
-                val txResponse = transaction.sign(key).execute(client)
-                val txReceipt = txResponse.getReceipt(client)
-
-                return txReceipt
-            } catch (e: PrecheckStatusException) {
-                if (e.status == Status.BUSY) {
-                    retries++
-                    println("Retry attempt: $retries")
-                } else {
-                    throw e
-                }
-            }
-        }
-
-        throw Exception("Transaction failed after $MAX_RETRIES attempts")
-    }
-
     data class NftTreasuryInfo(val tokenId: TokenId, val treasuryAccountInfo: AccountInfo)
 
     /**
@@ -300,6 +274,105 @@ class HederaService {
         }
 
         return NftTreasuryInfo(tokenId, accountInfo)
+    }
+
+    data class NftTokenInfo(val tokenId: String, val supplyKey: String)
+
+    /**
+     * Creates a non-fungible token (NFT) for a challenge.
+     *
+     * @param challenge The challenge object implementing the [Transactionable] interface.
+     * @param challengeName The name of the challenge.
+     * @param challengeSymbol The symbol of the challenge.
+     * @return The token ID of the created NFT as a string.
+     * @throws RuntimeException if the token creation fails.
+     */
+    fun createNftTokenForChallenge(
+        challenge: Transactionable,
+        challengeName: String,
+        challengeSymbol: String
+    ): NftTokenInfo {
+        val accountInfo = AccountInfo.fromTransactionable(challenge)
+        val supplyKey = PrivateKey.generateED25519()
+        val supplyPublicKey = supplyKey.publicKey
+
+        val treasuryId = accountInfo.accountId
+        val nftCreate = TokenCreateTransaction()
+            .setTokenName("Challenge $challengeName NFT")
+            .setTokenSymbol(challengeSymbol)
+            .setTokenType(TokenType.NON_FUNGIBLE_UNIQUE)
+            .setDecimals(0)
+            .setInitialSupply(0)
+            .setTreasuryAccountId(treasuryId)
+            .setSupplyType(TokenSupplyType.FINITE)
+            .setMaxSupply(250)
+            .setSupplyKey(supplyKey)
+            .freezeWith(client)
+
+        // Sign the transaction with the treasury key
+        val nftCreateTxSign = nftCreate.sign(accountInfo.key)
+        // Submit the transaction to a Hedera network
+        val nftCreateSubmit = nftCreateTxSign.execute(client)
+        // Get the transaction receipt
+        val nftCreateRx = nftCreateSubmit.getReceipt(client)
+        // Get the token ID
+        val tokenId = nftCreateRx.tokenId ?: throw RuntimeException("Failed to create token")
+        // Log the token ID
+        println("Created NFT with token ID $tokenId")
+
+        return NftTokenInfo(tokenId.toString(), supplyKey.toString())
+    }
+
+    /**
+     * Mints a non-fungible token (NFT) for a challenger.
+     *
+     * @param challenge The challenge object implementing the [Transactionable] interface.
+     * @param challengeName The name of the challenge.
+     * @param tokenIdStr The string representation of the token ID.
+     * @param supplyKeyStr The string representation of the supply private key.
+     * @param serial The serial number of the NFT.
+     * @return The token ID of the created NFT as a string.
+     * @throws RuntimeException if the token creation fails.
+     */
+    fun mintNftTokenForChallenger(
+        challenge: Transactionable,
+        challengeName: String,
+        tokenIdStr: String,
+        supplyKeyStr: String,
+        serial: Long
+    ): String {
+        val tokenId = TokenId.fromString(tokenIdStr)
+        val supplyKey = PrivateKey.fromString(supplyKeyStr)
+
+        val MAX_RETRIES = 5
+        var retries = 0
+        while (retries < MAX_RETRIES) {
+            try {
+                val MAX_TRANSACTION_FEE = 20
+                var mintTx = TokenMintTransaction()
+                    .setTokenId(tokenId)
+                    .setMaxTransactionFee(Hbar(MAX_TRANSACTION_FEE.toLong()))
+
+                mintTx.addMetadata("$challengeName".toByteArray())
+
+                mintTx = mintTx.freezeWith(client)
+
+                val mintTxSign = mintTx.sign(supplyKey)
+                val mintTxSubmit = mintTxSign.execute(client)
+                val mintRx = mintTxSubmit.getReceipt(client)
+
+                return NftId(tokenId, serial).toString()
+            } catch (ex: PrecheckStatusException) {
+                if (ex.status == Status.BUSY) {
+                    retries++;
+                    println("Retry attempt: " + retries);
+                } else {
+                    throw ex;
+                }
+            }
+        }
+
+        throw RuntimeException("Cannot create NFT token for challenger")
     }
 
     /**
