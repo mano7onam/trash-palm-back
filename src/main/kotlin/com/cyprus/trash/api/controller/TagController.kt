@@ -1,6 +1,8 @@
 package com.cyprus.trash.api.controller
 
+import com.cyprus.trash.api.model.ClaimTagBodyRequest
 import com.cyprus.trash.api.model.DataContainer
+import com.cyprus.trash.api.model.TagDecisionRequest
 import com.cyprus.trash.model.Tag
 import com.cyprus.trash.service.TagService
 import kotlinx.coroutines.flow.toList
@@ -31,6 +33,24 @@ class TagController(
         return ResponseEntity.ok(
             tagService.create(body)
         )
+    }
+
+    @PostMapping("/{id}/claim")
+    suspend fun claim(@RequestHeader email: String, @PathVariable id: String, @RequestBody body: ClaimTagBodyRequest): ResponseEntity<DataContainer> {
+        if (tagService.claim(email, id, body.photoUrls)) {
+            return ResponseEntity.ok(DataContainer(true.toString()))
+        }
+
+        return ResponseEntity.notFound().build()
+    }
+
+    @PostMapping("/{id}/decision")
+    suspend fun decision(@RequestHeader email: String, @PathVariable id: String, @RequestBody body: TagDecisionRequest): ResponseEntity<DataContainer> {
+        if (tagService.decision(id, email, body.decision)) {
+            return ResponseEntity.ok(DataContainer(true.toString()))
+        }
+
+        return ResponseEntity.notFound().build()
     }
 
     @PostMapping("/{id}/comments")
