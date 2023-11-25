@@ -47,4 +47,7 @@ tasks.withType<KotlinCompile> {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+	jvmArgs(
+		"--add-opens", "java.base/java.time=ALL-UNNAMED"
+	)
 }

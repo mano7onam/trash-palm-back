@@ -12,7 +12,7 @@ import java.util.UUID
 class TagRepositoryTest : MongodbTestBase() {
 
     @Test
-    fun `create or get account`(): Unit = runBlocking {
+    fun `full life cycle`(): Unit = runBlocking {
         val tagId = UUID.randomUUID().toString()
         val nftId = UUID.randomUUID().toString()
         val email = "someEmail@gmail.com"
@@ -36,6 +36,6 @@ class TagRepositoryTest : MongodbTestBase() {
         assertEquals(tag, repo.save(tag))
         assertEquals(1, repo.findAll().toList().size)
         assertEquals(true, repo.addComment(tagId, comment))
-        assertEquals(listOf(comment), repo.findAll().toList().first.comments)
+        assertEquals(listOf(comment), repo.findAll().toList().first().comments)
     }
 }

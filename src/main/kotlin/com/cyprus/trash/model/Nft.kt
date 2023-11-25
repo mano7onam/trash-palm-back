@@ -1,7 +1,9 @@
 package com.cyprus.trash.model
 
+import org.springframework.data.annotation.Id
+
 data class Nft(
-    val id: String,
+    @Id val id: String,
     val data: ByteArray,
     val value: Long
 ) {
