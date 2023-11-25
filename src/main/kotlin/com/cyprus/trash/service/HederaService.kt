@@ -41,7 +41,7 @@ class HederaService {
     @Throws(ReceiptStatusException::class, TimeoutException::class, PrecheckStatusException::class)
     fun createNewAccount(initialBalance: Long = 10): Transactionable? {
         val accountInfo = createNewAccountImpl(initialBalance) ?: return null
-        return TransactionableImpl(accountInfo.accountId.toString(), accountInfo.accountId.toString())
+        return TransactionableImpl(accountInfo.accountId.toString(), accountInfo.key.toString())
     }
 
     @Throws(ReceiptStatusException::class, TimeoutException::class, PrecheckStatusException::class)
@@ -100,13 +100,15 @@ class HederaService {
      * @return The result of the transaction, which is an instance of the `TransactionResult` enum.
      */
     fun withdrawHBARs(transactionable: Transactionable, amount: Long): TransactionResult {
-        val accountId = AccountId.fromString(transactionable.cryptoId)
-        withdrawHBARs(accountId, Hbar(amount))
+        val accountInfo = AccountInfo(AccountId.fromString(transactionable.cryptoId), PrivateKey.fromString(transactionable.cryptoPrivateKey))
+        withdrawHBARs(accountInfo, Hbar(amount))
         return TransactionResult.Ok
     }
 
-    private fun withdrawHBARs(accountId: AccountId, amount: Hbar): TransactionResponse {
-        return TransferTransaction().addHbarTransfer(accountId, amount.negated()).execute(client)
+    private fun withdrawHBARs(account: AccountInfo, amount: Hbar): TransactionResponse {
+        return TransferTransaction()
+            .addHbarTransfer(account.accountId, amount.negated())
+            .execute(client)
     }
 
     /**
@@ -118,17 +120,21 @@ class HederaService {
      * @return [TransactionResult] indicating the result of the transaction.
      */
     fun transferHBARs(sender: Transactionable, receiver: Transactionable, amount: Long): TransactionResult {
-        val senderId = AccountId.fromString(sender.cryptoId)
-        val receiverId = AccountId.fromString(receiver.cryptoId)
-        transferHBARs(senderId, receiverId, Hbar(amount))
+        val senderInfo = AccountInfo(AccountId.fromString(sender.cryptoId), PrivateKey.fromString(sender.cryptoPrivateKey))
+        val receiverInfo = AccountInfo(AccountId.fromString(receiver.cryptoId), PrivateKey.fromString(receiver.cryptoPrivateKey))
+        transferHBARs(senderInfo, receiverInfo, Hbar(amount))
         return TransactionResult.Ok
     }
 
-    private fun transferHBARs(senderId: AccountId, receiverId: AccountId, amount: Hbar): TransactionResponse {
+    private fun transferHBARs(sender: AccountInfo, receiver: AccountInfo, amount: Hbar): Status {
         return TransferTransaction()
-            .addHbarTransfer(senderId, amount.negated())
-            .addHbarTransfer(receiverId, amount)
+            .addHbarTransfer(sender.accountId, amount.negated())
+            .addHbarTransfer(receiver.accountId, amount)
+            .freezeWith(client)
+            .sign(sender.key)
             .execute(client)
+            .getReceipt(client)
+            .status
     }
 
     /**
