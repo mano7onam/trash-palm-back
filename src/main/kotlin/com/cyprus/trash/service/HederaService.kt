@@ -6,6 +6,7 @@ import io.github.cdimascio.dotenv.Dotenv
 import org.springframework.stereotype.Service
 import java.util.concurrent.TimeoutException
 
+
 @Service
 class HederaService {
     val client: Client by lazy { createHederaNftClient() }
@@ -40,16 +41,16 @@ class HederaService {
      */
     @Throws(ReceiptStatusException::class, TimeoutException::class, PrecheckStatusException::class)
     fun createNewAccount(initialBalance: Long = 10): Transactionable? {
-        val accountInfo = createNewAccountImpl(initialBalance) ?: return null
+        val accountInfo = createNewAccountImpl(Hbar(initialBalance)) ?: return null
         return TransactionableImpl(accountInfo.accountId.toString(), accountInfo.key.toString())
     }
 
     @Throws(ReceiptStatusException::class, TimeoutException::class, PrecheckStatusException::class)
-    private fun createNewAccountImpl(initialBalance: Long = 10): AccountInfo? {
+    private fun createNewAccountImpl(initialBalance: Hbar = Hbar.ZERO): AccountInfo? {
         val accountPrivateKey = PrivateKey.generateED25519()
         val account = AccountCreateTransaction()
             .setKey(accountPrivateKey.publicKey)
-            .setInitialBalance(Hbar(initialBalance))
+            .setInitialBalance(initialBalance)
             .execute(client)
 
         val accountId = account.getReceipt(client).accountId
@@ -57,6 +58,26 @@ class HederaService {
 
         if (null == accountId) return null
         return AccountInfo(accountId, accountPrivateKey)
+    }
+
+    fun deleteAccount(account: Transactionable): TransactionResult {
+        val accountInfo =
+            AccountInfo(AccountId.fromString(account.cryptoId), PrivateKey.fromString(account.cryptoPrivateKey))
+        deleteAccount(accountInfo)
+        return TransactionResult.Ok
+    }
+
+    private fun deleteAccount(account: AccountInfo): Status {
+        val operatorAccountId = client.operatorAccountId ?: throw RuntimeException("Cannot find operator account")
+
+        return AccountDeleteTransaction()
+            .setAccountId(account.accountId)
+            .setTransferAccountId(operatorAccountId)
+            .freezeWith(client)
+            .sign(account.key)
+            .execute(client)
+            .getReceipt(client)
+            .status
     }
 
     /**
@@ -83,13 +104,20 @@ class HederaService {
      * @return the result of the transaction, which can be [TransactionResult.Ok] if the top-up is successful
      */
     fun topUpHBARs(transactionable: Transactionable, amount: Long): TransactionResult {
-        val accountId = AccountId.fromString(transactionable.cryptoId)
-        topUpHBARs(accountId, Hbar(amount))
+        val accountInfo = AccountInfo(
+            AccountId.fromString(transactionable.cryptoId),
+            PrivateKey.fromString(transactionable.cryptoPrivateKey)
+        )
+        topUpHBARs(accountInfo, Hbar(amount))
         return TransactionResult.Ok
     }
 
-    private fun topUpHBARs(accountId: AccountId, amount: Hbar): TransactionResponse {
-        return TransferTransaction().addHbarTransfer(accountId, amount).execute(client)
+    private fun topUpHBARs(account: AccountInfo, amount: Hbar): Status {
+        val tempAccount =
+            createNewAccountImpl(amount) ?: throw RuntimeException("Cannot create temp account for withdraw")
+        val status = transferHBARs(tempAccount, account, amount)
+        deleteAccount(tempAccount)
+        return status
     }
 
     /**
@@ -100,15 +128,19 @@ class HederaService {
      * @return The result of the transaction, which is an instance of the `TransactionResult` enum.
      */
     fun withdrawHBARs(transactionable: Transactionable, amount: Long): TransactionResult {
-        val accountInfo = AccountInfo(AccountId.fromString(transactionable.cryptoId), PrivateKey.fromString(transactionable.cryptoPrivateKey))
+        val accountInfo = AccountInfo(
+            AccountId.fromString(transactionable.cryptoId),
+            PrivateKey.fromString(transactionable.cryptoPrivateKey)
+        )
         withdrawHBARs(accountInfo, Hbar(amount))
         return TransactionResult.Ok
     }
 
-    private fun withdrawHBARs(account: AccountInfo, amount: Hbar): TransactionResponse {
-        return TransferTransaction()
-            .addHbarTransfer(account.accountId, amount.negated())
-            .execute(client)
+    private fun withdrawHBARs(account: AccountInfo, amount: Hbar): Status {
+        val tempAccount = createNewAccountImpl() ?: throw RuntimeException("Cannot create temp account for withdraw")
+        val status = transferHBARs(account, tempAccount, amount)
+        deleteAccount(tempAccount)
+        return status
     }
 
     /**
@@ -120,8 +152,10 @@ class HederaService {
      * @return [TransactionResult] indicating the result of the transaction.
      */
     fun transferHBARs(sender: Transactionable, receiver: Transactionable, amount: Long): TransactionResult {
-        val senderInfo = AccountInfo(AccountId.fromString(sender.cryptoId), PrivateKey.fromString(sender.cryptoPrivateKey))
-        val receiverInfo = AccountInfo(AccountId.fromString(receiver.cryptoId), PrivateKey.fromString(receiver.cryptoPrivateKey))
+        val senderInfo =
+            AccountInfo(AccountId.fromString(sender.cryptoId), PrivateKey.fromString(sender.cryptoPrivateKey))
+        val receiverInfo =
+            AccountInfo(AccountId.fromString(receiver.cryptoId), PrivateKey.fromString(receiver.cryptoPrivateKey))
         transferHBARs(senderInfo, receiverInfo, Hbar(amount))
         return TransactionResult.Ok
     }

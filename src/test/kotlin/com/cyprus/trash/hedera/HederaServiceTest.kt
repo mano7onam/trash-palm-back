@@ -2,8 +2,10 @@ package com.cyprus.trash.hedera
 
 import com.cyprus.trash.service.HederaService
 import com.hedera.hashgraph.sdk.PrivateKey
+import com.hedera.hashgraph.sdk.ReceiptStatusException
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 
 class HederaServiceTest {
     @Test
@@ -12,6 +14,16 @@ class HederaServiceTest {
         assert(newAccount != null)
         val balance = HederaService().getAccountBalance(newAccount!!)
         assert(balance == 42L)
+        HederaService().deleteAccount(newAccount)
+    }
+
+    @Test
+    fun `delete account with amount`(): Unit = runBlocking {
+        val newAccount = HederaService().createNewAccount(42)
+        assert(newAccount != null)
+        val balance = HederaService().getAccountBalance(newAccount!!)
+        assert(balance == 42L)
+        HederaService().deleteAccount(newAccount)
     }
 
     @Test
@@ -40,10 +52,12 @@ class HederaServiceTest {
         HederaService().withdrawHBARs(account1!!, 10L)
         val balance = HederaService().getAccountBalance(account1)
         assert(balance == 32L)
+
+        HederaService().deleteAccount(account1)
     }
 
     @Test
-    fun `test withdraw 2`(): Unit = runBlocking {
+    fun `test withdraw 2`() {
         val account1 = HederaService().createNewAccount(42)
         assert(account1 != null)
 
@@ -53,7 +67,11 @@ class HederaServiceTest {
         assert(HederaService().getAccountBalance(account1) == 31L)
         HederaService().withdrawHBARs(account1, 10L)
         assert(HederaService().getAccountBalance(account1) == 21L)
-        HederaService().withdrawHBARs(account1, 22L)
+        assertThrows<ReceiptStatusException> {
+            HederaService().withdrawHBARs(account1, 22L)
+        }
+
+        HederaService().deleteAccount(account1)
     }
 
     @Test
@@ -63,6 +81,8 @@ class HederaServiceTest {
 
         HederaService().topUpHBARs(account1!!, 10L)
         assert(HederaService().getAccountBalance(account1) == 52L)
+
+        HederaService().deleteAccount(account1)
     }
 
     @Test
@@ -78,6 +98,8 @@ class HederaServiceTest {
         assert(HederaService().getAccountBalance(account1) == 41L)
         HederaService().topUpHBARs(account1, 4L)
         assert(HederaService().getAccountBalance(account1) == 45L)
+
+        HederaService().deleteAccount(account1)
     }
 
     @Test
@@ -90,5 +112,8 @@ class HederaServiceTest {
         HederaService().transferHBARs(account1!!, account2!!, 1L)
         assert(HederaService().getAccountBalance(account2) == 11L)
         assert(HederaService().getAccountBalance(account1) == 9L)
+
+        HederaService().deleteAccount(account1)
+        HederaService().deleteAccount(account2)
     }
 }
