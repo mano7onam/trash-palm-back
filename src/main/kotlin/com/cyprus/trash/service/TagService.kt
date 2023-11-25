@@ -16,6 +16,7 @@ class TagService(
     }
 
     suspend fun create(body: Tag): Tag {
+        //todo enrich by crypto info
         return tagRepository.save(body)
     }
 
@@ -39,7 +40,7 @@ class TagService(
         val tag = tagRepository.findBy(tagId)
         requireNotNull(tag)
         require(tag.status == TagStatus.PROCESSING) { "wrong tag status" }
-        require(tag.createdBy == email) { "wrong owner" }
+        require(tag.owner == email) { "wrong owner" }
 
         return when (decision) {
             TagDecision.CONFIRM -> tagRepository.saveDecision(tag.id, TagStatus.ACTIVE)

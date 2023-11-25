@@ -1,6 +1,7 @@
 package com.cyprus.trash.repository
 
 import com.cyprus.trash.model.Challenge
+import com.cyprus.trash.model.Nft
 import com.cyprus.trash.model.Tag
 import com.cyprus.trash.repo.ChallengeRepository
 import kotlinx.coroutines.flow.toList
@@ -23,7 +24,13 @@ class ChallengeRepositoryTest : MongodbTestBase() {
             title = "supper challenge",
             description = "challenge some",
             tagIds = listOf(tagId),
-            prizes = listOf(nftId),
+            nfts = listOf(
+                Nft(
+                    id = nftId,
+                    data = ByteArray(10),
+                    value = 10
+                )
+            ),
             deadline = Instant.now().plusSeconds(100_000).truncatedTo(ChronoUnit.SECONDS)
         )
 

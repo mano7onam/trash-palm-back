@@ -8,11 +8,13 @@ data class Tag (
     val latitude: Double,
     val title: String,
     val description: String,
-    val createdBy: String,
-    val prize: Nft? = null,
+    val owner: String,
+    override val cryptoId: String = "",
+    override val cryptoPrivateKey: String = "",
+    val prize: Long = 0,
     val photoUrls: List<String> = listOf(),
     val type: TagType = TagType.USER,
     val comments: List<String> = listOf(),
     val status: TagStatus = TagStatus.ACTIVE,
-    val claimer: String? = null
-)
+    val claimer: String? = null,
+) : Transactionable

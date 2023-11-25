@@ -11,6 +11,7 @@ class ChallengeService(
 ) {
 
     suspend fun create(challenge: Challenge): Challenge {
+        // todo enrich by crypto info
         return challengeRepository.save(challenge)
     }
 

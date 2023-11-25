@@ -1,15 +1,10 @@
 package com.cyprus.trash.api
 
 import com.cyprus.trash.api.controller.ChallengeController
-import com.cyprus.trash.api.controller.TagController
-import com.cyprus.trash.api.model.DataContainer
 import com.cyprus.trash.model.Challenge
 import com.cyprus.trash.model.Nft
-import com.cyprus.trash.model.Tag
 import com.cyprus.trash.repo.ChallengeRepository
-import com.cyprus.trash.repo.TagRepository
 import com.cyprus.trash.service.ChallengeService
-import com.cyprus.trash.service.TagService
 import kotlinx.coroutines.flow.flowOf
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -46,7 +41,13 @@ class ChallengeControllerTest {
         title = "supper challenge",
         description = "challenge some",
         tagIds = listOf(tagId),
-        prizes = listOf(nftId),
+        nfts = listOf(
+            Nft(
+                id = nftId,
+                data = ByteArray(10),
+                value = 10
+            )
+        ),
         deadline = Instant.now().plusSeconds(100_000).truncatedTo(ChronoUnit.SECONDS)
     )
 

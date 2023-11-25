@@ -2,7 +2,6 @@ package com.cyprus.trash.api
 
 import com.cyprus.trash.api.controller.TagController
 import com.cyprus.trash.api.model.DataContainer
-import com.cyprus.trash.model.Nft
 import com.cyprus.trash.model.Tag
 import com.cyprus.trash.repo.TagRepository
 import com.cyprus.trash.service.TagService
@@ -33,7 +32,6 @@ class TagControllerTest {
     private lateinit var webClient: WebTestClient
 
     private val tagId = UUID.randomUUID().toString()
-    private val nftId = UUID.randomUUID().toString()
     private val email = "someEmail@gmail.com"
     private val comment = "supper comment"
     private val tag = Tag(
@@ -42,12 +40,7 @@ class TagControllerTest {
         latitude = 5.0,
         title = "title",
         description = "description",
-        createdBy = email,
-        prize = Nft(
-            id = nftId,
-            data = ByteArray(10),
-            value = 10
-        )
+        owner = email
     )
 
     @Test
