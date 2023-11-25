@@ -1,13 +1,19 @@
 package com.cyprus.trash.api
 
 import com.cyprus.trash.api.controller.TagController
+import com.cyprus.trash.api.model.ClaimTagBodyRequest
 import com.cyprus.trash.api.model.DataContainer
+import com.cyprus.trash.api.model.TagDecision
+import com.cyprus.trash.api.model.TagDecisionRequest
+import com.cyprus.trash.api.model.TagVoteRequest
 import com.cyprus.trash.model.Account
 import com.cyprus.trash.model.Tag
+import com.cyprus.trash.model.TagStatus
 import com.cyprus.trash.repo.AccountRepository
 import com.cyprus.trash.repo.TagRepository
 import com.cyprus.trash.service.AccountService
 import com.cyprus.trash.service.HederaService
+import com.cyprus.trash.service.HederaService.TransactionResult
 import com.cyprus.trash.service.TagService
 import kotlinx.coroutines.flow.flowOf
 import org.junit.jupiter.api.Test
@@ -44,6 +50,8 @@ class TagControllerTest {
 
     private val tagId = UUID.randomUUID().toString()
     private val email = "someEmail@gmail.com"
+    private val claimEmail = "claim@gmail.com"
+    private val voteEmail = "claim@gmail.com"
     private val comment = "supper comment"
     private val cryptoId = "id"
     private val cryptoPrivateKey = "key"
@@ -60,6 +68,19 @@ class TagControllerTest {
         cryptoId = "",
         cryptoPrivateKey = "",
         name = "some"
+    )
+    private val voteAccount = Account(
+        email = voteEmail,
+        cryptoId = "",
+        cryptoPrivateKey = "",
+        name = "vote",
+        balance = 10
+    )
+    private val claimAccount = Account(
+        email = claimEmail,
+        cryptoId = "",
+        cryptoPrivateKey = "",
+        name = "claim",
     )
 
     @Test
@@ -81,6 +102,87 @@ class TagControllerTest {
             .exchange().also {
                 it.expectStatus().is2xxSuccessful
                 it.expectBody<Tag>().isEqualTo(tag)
+            }
+    }
+
+    @Test
+    fun claim() {
+        val newPhotos = listOf("url1", "url2")
+
+        tagRepository.stub {
+            onBlocking { findBy(tagId) } doReturn tag
+        }
+
+        tagRepository.stub {
+            onBlocking { saveClaiming(tagId, claimEmail, newPhotos) } doReturn true
+        }
+
+        webClient.post()
+            .uri("$URI/{id}/claim", tagId)
+            .contentType(MediaType.APPLICATION_JSON)
+            .header("email", claimEmail)
+            .body(BodyInserters.fromValue(ClaimTagBodyRequest(newPhotos)))
+            .exchange().also {
+                it.expectStatus().is2xxSuccessful
+                it.expectBody<DataContainer>().isEqualTo(DataContainer(true))
+            }
+    }
+
+    @Test
+    fun vote() {
+        val amount = 10L
+        tagRepository.stub {
+            onBlocking { findBy(tagId) } doReturn tag
+            onBlocking { saveVote(tagId, voteEmail, amount) } doReturn true
+        }
+
+        hederaService.stub {
+            on { transferHBARs(voteAccount, tag, amount) } doReturn TransactionResult.Ok
+        }
+
+        accountRepository.stub {
+            onBlocking { changeBalance(email, amount, false) } doReturn true
+            onBlocking { get(voteEmail) } doReturn voteAccount
+        }
+
+        webClient.post()
+            .uri("$URI/{id}/vote", tagId)
+            .contentType(MediaType.APPLICATION_JSON)
+            .header("email", voteEmail)
+            .body(BodyInserters.fromValue(TagVoteRequest(10)))
+            .exchange().also {
+                it.expectStatus().is2xxSuccessful
+                it.expectBody<DataContainer>().isEqualTo(DataContainer(true))
+            }
+    }
+
+
+    @Test
+    fun approve() {
+        val amount = 10L
+        val processingTag = tag.copy(prize = amount, status = TagStatus.PROCESSING, claimer = claimEmail)
+        tagRepository.stub {
+            onBlocking { findBy(tagId) } doReturn processingTag
+            onBlocking { saveDecision(tagId, TagStatus.FINISHED) } doReturn true
+        }
+
+        hederaService.stub {
+            on { transferHBARs(processingTag, claimAccount, amount) } doReturn TransactionResult.Ok
+        }
+
+        accountRepository.stub {
+            onBlocking { changeBalance(claimEmail, amount, true) } doReturn true
+            onBlocking { get(claimEmail) } doReturn claimAccount
+        }
+
+        webClient.post()
+            .uri("$URI/{id}/decision", tagId)
+            .contentType(MediaType.APPLICATION_JSON)
+            .header("email", email)
+            .body(BodyInserters.fromValue(TagDecisionRequest(TagDecision.CONFIRM)))
+            .exchange().also {
+                it.expectStatus().is2xxSuccessful
+                it.expectBody<DataContainer>().isEqualTo(DataContainer(true))
             }
     }
 

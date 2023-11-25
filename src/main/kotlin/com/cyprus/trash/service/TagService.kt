@@ -63,7 +63,7 @@ class TagService(
 
         requireNotNull(tag)
         requireNotNull(account)
-        require(account.balance > amount)
+        require(account.balance >= amount)
 
         val rs = hederaService.transferHBARs(account, tag, amount)
         require(rs == HederaService.TransactionResult.Ok)
@@ -74,9 +74,11 @@ class TagService(
 
     suspend fun decision(tagId: String, email: String, decision: TagDecision): Boolean {
         val tag = tagRepository.findBy(tagId)
-        val claimer = accountService.get(email)
 
         requireNotNull(tag)
+        requireNotNull(tag.claimer)
+
+        val claimer = accountService.get(tag.claimer)
         requireNotNull(claimer)
 
         require(tag.status == TagStatus.PROCESSING) { "wrong tag status" }
