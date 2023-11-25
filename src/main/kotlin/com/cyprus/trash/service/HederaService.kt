@@ -55,39 +55,21 @@ object HederaService {
         )
     }
 
-    fun makeTransferNft(client: Client, tokenId: TokenId, sender: AccountInfo, receiver: AccountInfo) {
-        val tokenTransferTx: TransferTransaction = TransferTransaction()
-            .addNftTransfer(NftId(tokenId, 1), sender.accountId, receiver.accountId)
-            .freezeWith(client)
-            .sign(sender.key)
-
-        val tokenTransferSubmit: TransactionResponse = tokenTransferTx.execute(client)
-        val tokenTransferRx: TransactionReceipt = tokenTransferSubmit.getReceipt(client)
-
-        println("NFT transfer from sender to receiver: " + tokenTransferRx.status)
-    }
-
-    /**
-     * Retrieves the account balance of the specified account ID.
-     *
-     * @param accountId the ID of the account
-     * @return the account balance in Hbars
-     */
     fun getAccountBalance(accountId: AccountId): Hbar {
         return AccountBalanceQuery()
             .setAccountId(accountId)
             .execute(client).hbars
     }
 
-    /**
-     * Transfers a specified amount of HBAR from one account to another.
-     *
-     * @param senderId the ID of the account from which the HBAR is to be transferred
-     * @param receiverId the ID of the account to which the HBAR is to be transferred
-     * @param amount the amount of HBAR to be transferred
-     * @return the response of the transaction
-     */
-    fun transferHBAR(senderId: AccountId, receiverId: AccountId, amount: Hbar): TransactionResponse {
+    fun topUpHBARs(accountId: AccountId, amount: Hbar): TransactionResponse {
+        return TransferTransaction().addHbarTransfer(accountId, amount).execute(client)
+    }
+
+    fun withdrawHBARs(accountId: AccountId, amount: Hbar): TransactionResponse {
+        return TransferTransaction().addHbarTransfer(accountId, amount.negated()).execute(client)
+    }
+
+    fun transferHBARs(senderId: AccountId, receiverId: AccountId, amount: Hbar): TransactionResponse {
         return TransferTransaction()
             .addHbarTransfer(senderId, amount)
             .addHbarTransfer(receiverId, amount)
