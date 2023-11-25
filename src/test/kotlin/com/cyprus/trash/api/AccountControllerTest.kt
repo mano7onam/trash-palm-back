@@ -37,7 +37,7 @@ class AccountControllerTest {
         val cryptoId = "id"
         val cryptoPrivateKey = "key"
         val login = "some"
-        val email = login + AccountService.G_MAIL
+        val email = "$login@gmail.com"
         val account = Account(
             email = email,
             cryptoId = "",
@@ -51,14 +51,12 @@ class AccountControllerTest {
 
         accountRepository.stub {
             onBlocking { get(any()) } doReturn null
-        }
-
-        accountRepository.stub {
             onBlocking { save(account.copy(cryptoId = cryptoId, cryptoPrivateKey = cryptoPrivateKey)) } doReturn account
         }
 
         webClient.get()
-            .uri(URI, login)
+            .uri(URI)
+            .header("email", email)
             .exchange().also {
                 it.expectStatus().is2xxSuccessful
                 it.expectBody<Account>().isEqualTo(account)
@@ -66,7 +64,7 @@ class AccountControllerTest {
     }
 
     companion object {
-        private const val URI = "/accounts/{login}"
+        private const val URI = "/accounts"
     }
 
 }

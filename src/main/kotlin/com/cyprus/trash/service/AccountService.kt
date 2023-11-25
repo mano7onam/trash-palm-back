@@ -10,12 +10,7 @@ class AccountService(
     private val hederaService: HederaService
 ) {
 
-    companion object {
-        const val G_MAIL = "@gmail.com"
-    }
-
-    suspend fun getOrCreate(login: String): Account {
-        val email = login + G_MAIL
+    suspend fun getOrCreate(email: String): Account {
         val account = accountRepository.get(email)
         if (account == null) {
             val accountInfo = hederaService.createNewAccount(0)
@@ -26,7 +21,7 @@ class AccountService(
                     email = email,
                     cryptoId = accountInfo.cryptoId,
                     cryptoPrivateKey = accountInfo.cryptoPrivateKey,
-                    name = login
+                    name = email.split("@")[0]
                 )
             )
         }

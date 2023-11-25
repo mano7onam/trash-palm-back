@@ -12,7 +12,7 @@ class AccountRepositoryTest : MongodbTestBase() {
     @Test
     fun `create or get account`(): Unit = runBlocking {
         val login = "some"
-        val email = login + AccountService.G_MAIL
+        val email = "$login@gmail.com"
         val account = Account(
             email = email,
             cryptoId = "",
