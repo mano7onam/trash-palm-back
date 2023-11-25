@@ -4,6 +4,8 @@ import com.cyprus.trash.api.controller.AccountController
 import com.cyprus.trash.model.Account
 import com.cyprus.trash.repo.AccountRepository
 import com.cyprus.trash.service.AccountService
+import com.cyprus.trash.service.HederaService
+import com.cyprus.trash.service.HederaService.TransactionableImpl
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.kotlin.any
@@ -24,11 +26,16 @@ class AccountControllerTest {
     @MockBean
     private lateinit var accountRepository: AccountRepository
 
+    @MockBean
+    private lateinit var hederaService: HederaService
+
     @Autowired
     private lateinit var webClient: WebTestClient
 
     @Test
     fun `create or get account`() {
+        val cryptoId = "id"
+        val cryptoPrivateKey = "key"
         val login = "some"
         val email = login + AccountService.G_MAIL
         val account = Account(
@@ -38,13 +45,16 @@ class AccountControllerTest {
             name = login
         )
 
+        hederaService.stub {
+            onBlocking { createNewAccount(0) } doReturn TransactionableImpl(cryptoId, cryptoPrivateKey)
+        }
 
         accountRepository.stub {
             onBlocking { get(any()) } doReturn null
         }
 
         accountRepository.stub {
-            onBlocking { save(any()) } doReturn account
+            onBlocking { save(account.copy(cryptoId = cryptoId, cryptoPrivateKey = cryptoPrivateKey)) } doReturn account
         }
 
         webClient.get()

@@ -4,8 +4,8 @@ import org.springframework.data.annotation.Id
 
 data class Tag (
     @Id val id: String,
-    val longitude: Double,
-    val latitude: Double,
+    val lon: Double,
+    val lat: Double,
     val title: String,
     val description: String,
     val owner: String,
@@ -17,4 +17,5 @@ data class Tag (
     val comments: List<String> = listOf(),
     val status: TagStatus = TagStatus.ACTIVE,
     val claimer: String? = null,
+    val voters: List<String> = listOf()
 ) : Transactionable

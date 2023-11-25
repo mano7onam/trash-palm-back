@@ -3,10 +3,11 @@ package com.cyprus.trash.service
 import com.cyprus.trash.model.Transactionable
 import com.hedera.hashgraph.sdk.*
 import io.github.cdimascio.dotenv.Dotenv
+import org.springframework.stereotype.Service
 import java.util.concurrent.TimeoutException
 
-
-object HederaService {
+@Service
+class HederaService {
     val client: Client by lazy { createHederaNftClient() }
 
     private fun createHederaNftClient(): Client {

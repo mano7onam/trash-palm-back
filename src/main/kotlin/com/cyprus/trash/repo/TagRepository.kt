@@ -52,11 +52,11 @@ class TagRepository(
         ).awaitFirst().modifiedCount > 0
     }
 
-    suspend fun saveClaiming(id: String, email: String, photoUrls: List<String>): Boolean {
+    suspend fun saveClaiming(tagId: String, email: String, photoUrls: List<String>): Boolean {
         return mongoTemplate.updateFirst(
             Query().apply {
                 addCriteria(
-                    where(Tag::id).isEqualTo(id)
+                    where(Tag::id).isEqualTo(tagId)
                 )
                 addCriteria(
                     where(Tag::status).isEqualTo(TagStatus.ACTIVE)
@@ -70,11 +70,11 @@ class TagRepository(
         ).awaitFirst().modifiedCount > 0
     }
 
-    suspend fun saveDecision(id: String, status: TagStatus): Boolean {
+    suspend fun saveDecision(tagId: String, status: TagStatus): Boolean {
         return mongoTemplate.updateFirst(
             Query().apply {
                 addCriteria(
-                    where(Tag::id).isEqualTo(id)
+                    where(Tag::id).isEqualTo(tagId)
                 )
                 addCriteria(
                     where(Tag::status).isEqualTo(TagStatus.PROCESSING)
@@ -86,9 +86,22 @@ class TagRepository(
         ).awaitFirst().modifiedCount > 0
     }
 
-    companion object {
-        private val CLASS = Tag::class.java
-        private val COLLECTION_NAME = "tags"
+    suspend fun saveVote(tagId: String, email: String, amount: Long): Boolean {
+        return mongoTemplate.updateFirst(
+            Query().apply {
+                addCriteria(
+                    where(Tag::id).isEqualTo(tagId)
+                )
+            },
+            Update().inc(Tag::prize.name, amount)
+                .push(Tag::voters.name, email),
+            CLASS,
+            COLLECTION_NAME
+        ).awaitFirst().modifiedCount > 0
     }
 
+    companion object {
+        private val CLASS = Tag::class.java
+        private const val COLLECTION_NAME = "tags"
+    }
 }

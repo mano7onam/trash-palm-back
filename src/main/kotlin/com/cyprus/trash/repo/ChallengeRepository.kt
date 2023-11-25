@@ -22,6 +22,6 @@ class ChallengeRepository(
 
     companion object {
         private val CLASS = Challenge::class.java
-        private val COLLECTION_NAME = "challenges"
+        private const val COLLECTION_NAME = "challenges"
     }
 }
