@@ -1,8 +1,10 @@
 package com.cyprus.trash.service
 
 import com.cyprus.trash.model.Transactionable
+import com.google.gson.Gson
 import com.hedera.hashgraph.sdk.*
 import io.github.cdimascio.dotenv.Dotenv
+import org.springframework.http.RequestEntity.post
 import org.springframework.stereotype.Service
 import java.util.concurrent.TimeoutException
 
@@ -323,28 +325,19 @@ class HederaService {
         return NftTokenInfo(tokenId.toString(), supplyKey.toString())
     }
 
-    /**
-     * Mints a non-fungible token (NFT) for a challenger.
-     *
-     * @param challenge The challenge object implementing the [Transactionable] interface.
-     * @param challengeName The name of the challenge.
-     * @param tokenIdStr The string representation of the token ID.
-     * @param supplyKeyStr The string representation of the supply private key.
-     * @param serial The serial number of the NFT.
-     * @return The token ID of the created NFT as a string.
-     * @throws RuntimeException if the token creation fails.
-     */
+    data class NftInformationToSave(val challengerName: String, val imageUrl: String)
+
     fun mintNftTokenForChallenger(
         challenge: Transactionable,
-        challengeName: String,
+        nftInfo: NftInformationToSave,
         tokenIdStr: String,
         supplyKeyStr: String,
-        serial: Long
+        serial: Long,
     ): String {
         val tokenId = TokenId.fromString(tokenIdStr)
         val supplyKey = PrivateKey.fromString(supplyKeyStr)
 
-        val MAX_RETRIES = 5
+        val MAX_RETRIES = 10
         var retries = 0
         while (retries < MAX_RETRIES) {
             try {
@@ -353,7 +346,8 @@ class HederaService {
                     .setTokenId(tokenId)
                     .setMaxTransactionFee(Hbar(MAX_TRANSACTION_FEE.toLong()))
 
-                mintTx.addMetadata("$challengeName".toByteArray())
+                val aaa: String = "Challenger: ${nftInfo.challengerName}"
+                mintTx.addMetadata(aaa.toByteArray())
 
                 mintTx = mintTx.freezeWith(client)
 
@@ -370,9 +364,30 @@ class HederaService {
                     throw ex;
                 }
             }
+            catch (ex: MaxAttemptsExceededException) {
+                retries++
+                println("Retry attempt: " + retries);
+            }
         }
 
         throw RuntimeException("Cannot create NFT token for challenger")
+    }
+
+    /**
+     * Retrieves the NFT information for the specified NFT ID.
+     *
+     * @param nftIdStr The string representation of the NFT ID.
+     * @return An instance of [NftInformationToSave] containing the NFT information.
+     */
+    fun getNftInfo(nftIdStr: String): NftInformationToSave {
+        val nftId = NftId.fromString(nftIdStr)
+        val metadata = TokenNftInfoQuery()
+            .setNftId(nftId)
+            .execute(client)[0].metadata
+        val gson = Gson()
+        val jsonStringFromBytes = String(metadata, Charsets.UTF_8)
+        val nftInfo = gson.fromJson(jsonStringFromBytes, NftInformationToSave::class.java)
+        return nftInfo
     }
 
     /**
@@ -455,21 +470,20 @@ class HederaService {
     /**
      * Distributes non-fungible tokens (NFTs) to a list of challengers.
      *
-     * @param challengeName The name of the challenge.
-     * @param challengeSymbol The symbol of the challenge.
-     * @param challengers The list of [AccountInfo] objects representing the challengers to whom the NFTs will be distributed.
+     * @param challenge The challenge object implementing the [Transactionable] interface.
+     * @param challengers The list of challenger objects implementing the [Transactionable] interface.
+     * @param tokenId The ID of the token to be distributed.
      */
-    fun distributeNftsToChallengers(challengeName: String, challengeSymbol: String, challengers: List<AccountInfo>) {
-        val treasuryNftInfo = makeNftsForChallenge(challengers.size, challengeName, challengeSymbol) ?: return
+    fun distributeNftsToChallengers(challenge: Transactionable, challengers: List<Transactionable>, tokenId: String) {
+        val challengeAccount = AccountInfo.fromTransactionable(challenge)
         for (challenger in challengers.withIndex()) {
+            val challengerAccount = AccountInfo.fromTransactionable(challenger.value)
             transferNftToAccount(
-                treasuryNftInfo.treasuryAccountInfo,
-                challenger.value,
-                treasuryNftInfo.tokenId,
+                challengeAccount,
+                challengerAccount,
+                TokenId.fromString(tokenId),
                 (challenger.index + 1).toLong()
             )
-            println("-------------------------")
-            println()
         }
     }
 }

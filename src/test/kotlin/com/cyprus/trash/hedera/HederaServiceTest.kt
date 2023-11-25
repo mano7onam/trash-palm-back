@@ -1,11 +1,18 @@
 package com.cyprus.trash.hedera
 
 import com.cyprus.trash.service.HederaService
+import com.hedera.hashgraph.sdk.NftId
 import com.hedera.hashgraph.sdk.PrivateKey
 import com.hedera.hashgraph.sdk.ReceiptStatusException
+import com.hedera.hashgraph.sdk.TokenId
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import org.springframework.http.HttpEntity
+import org.springframework.http.HttpHeaders
+import org.springframework.http.ResponseEntity
+import org.springframework.web.client.HttpClientErrorException
+import org.springframework.web.client.RestTemplate
 
 class HederaServiceTest {
     @Test
@@ -148,5 +155,35 @@ class HederaServiceTest {
         HederaService().deleteAccount(account1)
         HederaService().deleteAccount(account2)
         HederaService().deleteAccount(account3)
+    }
+
+    @Test
+    fun `test challenge nfts`(): Unit {
+        val account1 = HederaService().createNewAccount(10)
+        val account2 = HederaService().createNewAccount(10)
+        val account3 = HederaService().createNewAccount(10)
+        val accounts = listOf(account1!!, account2!!, account3!!)
+
+        val challengeAccount = HederaService().createNewAccount(10)!!
+        val tokenInfo = HederaService().createNftTokenForChallenge(challengeAccount, "The Challenge", "TH")
+
+        val imageUrl = "https://shorturl.at/amHUW"
+        for (account in accounts.withIndex()) {
+            val nftInfo = HederaService.NftInformationToSave(
+                "Challenger ${account.index}",
+                imageUrl
+            )
+            val nftIdStr = HederaService().mintNftTokenForChallenger(challengeAccount, nftInfo, tokenInfo.tokenId, tokenInfo.supplyKey, (account.index + 1).toLong())
+            val nftInfoAgain = HederaService().getNftInfo(nftIdStr)
+            assert(nftInfoAgain == nftInfo)
+        }
+
+        HederaService().distributeNftsToChallengers(challengeAccount, accounts, tokenInfo.tokenId)
+
+        for (i in 1 .. accounts.size) {
+            val nftIdStr = NftId(TokenId.fromString(tokenInfo.tokenId), i.toLong()).toString()
+            val nftInfo = HederaService().getNftInfo(nftIdStr)
+            assert(nftInfo.imageUrl == imageUrl)
+        }
     }
 }
