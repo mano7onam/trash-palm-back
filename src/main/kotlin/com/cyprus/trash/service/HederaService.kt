@@ -1,5 +1,6 @@
 package com.cyprus.trash.service
 
+import com.cyprus.trash.model.Transactionable
 import com.hedera.hashgraph.sdk.*
 import io.github.cdimascio.dotenv.Dotenv
 import java.util.concurrent.TimeoutException
@@ -22,19 +23,28 @@ object HederaService {
 
     data class AccountInfo(val accountId: AccountId, val key: PrivateKey)
 
+    enum class TransactionResult { Ok, Error }
+
+    class TransactionableImpl(override val cryptoId: String, override val cryptoPrivateKey: String) : Transactionable
+
     /**
-     * Creates a new account with the specified initial balance.
+     * Creates a new account with an optional initial balance.
      *
-     * @param client The Hedera client.
-     * @param initialBalance The initial balance for the new account (default value is 10).
-     * @return An [AccountInfo] object containing the account ID and private key of the created account,
+     * @param initialBalance The initial balance of the new account. Defaults to 10 if not specified.
+     * @return An instance of [Transactionable] containing the crypto ID and private key of the newly created account,
      *         or null if the account creation fails.
-     * @throws ReceiptStatusException if there was an error retrieving the receipt for the account creation transaction.
-     * @throws TimeoutException if the operation times out.
-     * @throws PrecheckStatusException if the transaction failed pre-check.
+     * @throws ReceiptStatusException if there is an issue with the transaction receipt.
+     * @throws TimeoutException if the transaction execution times out.
+     * @throws PrecheckStatusException if the transaction fails the pre-check validations.
      */
     @Throws(ReceiptStatusException::class, TimeoutException::class, PrecheckStatusException::class)
-    fun createNewAccount(initialBalance: Long = 10): AccountInfo? {
+    fun createNewAccount(initialBalance: Long = 10): Transactionable? {
+        val accountInfo = createNewAccountImpl(initialBalance) ?: return null
+        return TransactionableImpl(accountInfo.accountId.toString(), accountInfo.accountId.toString())
+    }
+
+    @Throws(ReceiptStatusException::class, TimeoutException::class, PrecheckStatusException::class)
+    private fun createNewAccountImpl(initialBalance: Long = 10): AccountInfo? {
         val accountPrivateKey = PrivateKey.generateED25519()
         val account = AccountCreateTransaction()
             .setKey(accountPrivateKey.publicKey)
@@ -48,30 +58,74 @@ object HederaService {
         return AccountInfo(accountId, accountPrivateKey)
     }
 
-    fun getAccountInfo(accountId: String, privateKey: String): AccountInfo {
-        return AccountInfo(
-            AccountId.fromString(accountId),
-            PrivateKey.fromString(privateKey)
-        )
+    /**
+     * Retrieves the account balance for a given transactionable.
+     *
+     * @param transactionable The transactionable object with cryptoId and cryptoPrivateKey properties.
+     * @return The account balance as a Long value.
+     */
+    fun getAccountBalance(transactionable: Transactionable): Long {
+        return getAccountBalance(AccountId.fromString(transactionable.cryptoId)).value.toLong()
     }
 
-    fun getAccountBalance(accountId: AccountId): Hbar {
+    private fun getAccountBalance(accountId: AccountId): Hbar {
         return AccountBalanceQuery()
             .setAccountId(accountId)
             .execute(client).hbars
     }
 
-    fun topUpHBARs(accountId: AccountId, amount: Hbar): TransactionResponse {
+    /**
+     * Tops up the HBARs in the given [transactionable] account with the specified [amount].
+     *
+     * @param transactionable the account to top up with HBARs
+     * @param amount the amount of HBARs to top up
+     * @return the result of the transaction, which can be [TransactionResult.Ok] if the top-up is successful
+     */
+    fun topUpHBARs(transactionable: Transactionable, amount: Long): TransactionResult {
+        val accountId = AccountId.fromString(transactionable.cryptoId)
+        topUpHBARs(accountId, Hbar(amount))
+        return TransactionResult.Ok
+    }
+
+    private fun topUpHBARs(accountId: AccountId, amount: Hbar): TransactionResponse {
         return TransferTransaction().addHbarTransfer(accountId, amount).execute(client)
     }
 
-    fun withdrawHBARs(accountId: AccountId, amount: Hbar): TransactionResponse {
+    /**
+     * Withdraws a specified amount of HBAR from a given `Transactionable`.
+     *
+     * @param transactionable The object representing the transaction details, must implement the `Transactionable` interface.
+     * @param amount The amount of HBAR to be withdrawn.
+     * @return The result of the transaction, which is an instance of the `TransactionResult` enum.
+     */
+    fun withdrawHBARs(transactionable: Transactionable, amount: Long): TransactionResult {
+        val accountId = AccountId.fromString(transactionable.cryptoId)
+        withdrawHBARs(accountId, Hbar(amount))
+        return TransactionResult.Ok
+    }
+
+    private fun withdrawHBARs(accountId: AccountId, amount: Hbar): TransactionResponse {
         return TransferTransaction().addHbarTransfer(accountId, amount.negated()).execute(client)
     }
 
-    fun transferHBARs(senderId: AccountId, receiverId: AccountId, amount: Hbar): TransactionResponse {
+    /**
+     * Transfers a specified amount of HBARs from the sender to the receiver.
+     *
+     * @param sender The sender object implementing the [Transactionable] interface.
+     * @param receiver The receiver object implementing the [Transactionable] interface.
+     * @param amount The amount of HBARs to transfer.
+     * @return [TransactionResult] indicating the result of the transaction.
+     */
+    fun transferHBARs(sender: Transactionable, receiver: Transactionable, amount: Long): TransactionResult {
+        val senderId = AccountId.fromString(sender.cryptoId)
+        val receiverId = AccountId.fromString(receiver.cryptoId)
+        transferHBARs(senderId, receiverId, Hbar(amount))
+        return TransactionResult.Ok
+    }
+
+    private fun transferHBARs(senderId: AccountId, receiverId: AccountId, amount: Hbar): TransactionResponse {
         return TransferTransaction()
-            .addHbarTransfer(senderId, amount)
+            .addHbarTransfer(senderId, amount.negated())
             .addHbarTransfer(receiverId, amount)
             .execute(client)
     }
@@ -124,8 +178,12 @@ object HederaService {
      * @throws RuntimeException if the new account creation fails.
      * @throws RuntimeException if the token creation fails.
      */
-    fun makeNftsForChallenge(numberOfChallengers: Int, challengeName: String, challengeSymbol: String): NftTreasuryInfo? {
-        val accountInfo: AccountInfo? = createNewAccount()
+    fun makeNftsForChallenge(
+        numberOfChallengers: Int,
+        challengeName: String,
+        challengeSymbol: String
+    ): NftTreasuryInfo? {
+        val accountInfo: AccountInfo? = createNewAccountImpl()
         if (accountInfo == null) {
             throw RuntimeException("Failed to create new account")
         }
@@ -183,8 +241,7 @@ object HederaService {
                     val mintRx = mintTxSubmit.getReceipt(client)
                     println("Created NFT " + tokenId + " with serial: " + mintRx.serials)
                     return batchNftsCounter
-                }
-                catch (ex: PrecheckStatusException) {
+                } catch (ex: PrecheckStatusException) {
                     if (ex.status == Status.BUSY) {
                         retries++;
                         println("Retry attempt: " + retries);
@@ -291,7 +348,12 @@ object HederaService {
     fun distributeNftsToChallengers(challengeName: String, challengeSymbol: String, challengers: List<AccountInfo>) {
         val treasuryNftInfo = makeNftsForChallenge(challengers.size, challengeName, challengeSymbol) ?: return
         for (challenger in challengers.withIndex()) {
-            transferNftToAccount(treasuryNftInfo.treasuryAccountInfo, challenger.value, treasuryNftInfo.tokenId, (challenger.index + 1).toLong())
+            transferNftToAccount(
+                treasuryNftInfo.treasuryAccountInfo,
+                challenger.value,
+                treasuryNftInfo.tokenId,
+                (challenger.index + 1).toLong()
+            )
             println("-------------------------")
             println()
         }
