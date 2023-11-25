@@ -34,7 +34,7 @@ object HederaService {
      * @throws PrecheckStatusException if the transaction failed pre-check.
      */
     @Throws(ReceiptStatusException::class, TimeoutException::class, PrecheckStatusException::class)
-    fun createNewAccount(client: Client, initialBalance: Long = 10): AccountInfo? {
+    fun createNewAccount(initialBalance: Long = 10): AccountInfo? {
         val accountPrivateKey = PrivateKey.generateED25519()
         val account = AccountCreateTransaction()
             .setKey(accountPrivateKey.publicKey)
@@ -125,7 +125,7 @@ object HederaService {
      * @throws RuntimeException if the token creation fails.
      */
     fun makeNftsForChallenge(numberOfChallengers: Int, challengeName: String, challengeSymbol: String): NftTreasuryInfo? {
-        val accountInfo: AccountInfo? = createNewAccount(client)
+        val accountInfo: AccountInfo? = createNewAccount()
         if (accountInfo == null) {
             throw RuntimeException("Failed to create new account")
         }
