@@ -4,7 +4,6 @@ import com.cyprus.trash.model.Transactionable
 import com.google.gson.Gson
 import com.hedera.hashgraph.sdk.*
 import io.github.cdimascio.dotenv.Dotenv
-import org.springframework.http.RequestEntity.post
 import org.springframework.stereotype.Service
 import java.util.concurrent.TimeoutException
 
@@ -337,7 +336,8 @@ class HederaService {
         val tokenId = TokenId.fromString(tokenIdStr)
         val supplyKey = PrivateKey.fromString(supplyKeyStr)
 
-        val MAX_RETRIES = 10
+        val MAX_RETRIES = 20
+        val MAX_ATTEMPTS = 100
         var retries = 0
         while (retries < MAX_RETRIES) {
             try {
@@ -345,9 +345,12 @@ class HederaService {
                 var mintTx = TokenMintTransaction()
                     .setTokenId(tokenId)
                     .setMaxTransactionFee(Hbar(MAX_TRANSACTION_FEE.toLong()))
+                    .setMaxAttempts(MAX_ATTEMPTS)
 
-                val aaa: String = "Challenger: ${nftInfo.challengerName}"
-                mintTx.addMetadata(aaa.toByteArray())
+                val gson = Gson()
+                val jsonString = gson.toJson(nftInfo)
+                val byteArray = jsonString.toByteArray(Charsets.UTF_8)
+                mintTx.addMetadata(byteArray)
 
                 mintTx = mintTx.freezeWith(client)
 
@@ -360,6 +363,7 @@ class HederaService {
                 if (ex.status == Status.BUSY) {
                     retries++;
                     println("Retry attempt: " + retries);
+                    Thread.sleep(1000)
                 } else {
                     throw ex;
                 }
@@ -367,6 +371,7 @@ class HederaService {
             catch (ex: MaxAttemptsExceededException) {
                 retries++
                 println("Retry attempt: " + retries);
+                Thread.sleep(1000)
             }
         }
 
@@ -386,18 +391,11 @@ class HederaService {
             .execute(client)[0].metadata
         val gson = Gson()
         val jsonStringFromBytes = String(metadata, Charsets.UTF_8)
+        println("String from data $jsonStringFromBytes")
         val nftInfo = gson.fromJson(jsonStringFromBytes, NftInformationToSave::class.java)
         return nftInfo
     }
 
-    /**
-     * Transfers the specified non-fungible token (NFT) from the treasury account to the receiver account.
-     *
-     * @param treasuryAccountInfo The [AccountInfo] object containing the details of the treasury account.
-     * @param receiverAccountInfo The [AccountInfo] object containing the details of the receiver account.
-     * @param tokenId The ID of the NFT to be transferred.
-     * @param serial The serial number of the NFT to be transferred.
-     */
     fun transferNftToAccount(
         treasuryAccountInfo: AccountInfo,
         receiverAccountInfo: AccountInfo,
@@ -427,7 +425,7 @@ class HederaService {
 
 
         // Confirm the transaction was successful
-        println("NFT association with Alice's account: " + associateAliceRx.status)
+        println("NFT association with challenger account: " + associateAliceRx.status)
 
 
         // Check the balance before the NFT transfer for the treasury account
@@ -437,9 +435,9 @@ class HederaService {
 
 
         // Check the balance before the NFT transfer for Alice's account
-        val balanceCheckAlice = AccountBalanceQuery().setAccountId(receiverAccountId)
+        val balanceCheckChallenger = AccountBalanceQuery().setAccountId(receiverAccountId)
             .execute(client)
-        println("Alice's balance: " + balanceCheckAlice.tokens + "NFTs of ID " + tokenId)
+        println("Challenger user balance: " + balanceCheckChallenger.tokens + "NFTs of ID " + tokenId)
 
 
         // Transfer NFT from treasury to Alice
@@ -452,7 +450,7 @@ class HederaService {
         val tokenTransferSubmit = tokenTransferTx.execute(client)
         val tokenTransferRx = tokenTransferSubmit.getReceipt(client)
 
-        println("NFT transfer from Treasury to Alice: " + tokenTransferRx.status)
+        println("NFT transfer from Treasury to Challenger: " + tokenTransferRx.status)
 
 
         // Check the balance for the treasury account after the transfer
@@ -462,9 +460,9 @@ class HederaService {
 
 
         // Check the balance for Alice's account after the transfer
-        val balanceCheckAlice2 = AccountBalanceQuery().setAccountId(receiverAccountId)
+        val balanceCheckChallenger2 = AccountBalanceQuery().setAccountId(receiverAccountId)
             .execute(client)
-        println("Alice's balance: " + balanceCheckAlice2.tokens + "NFTs of ID " + tokenId)
+        println("Challenger balance: " + balanceCheckChallenger2.tokens + "NFTs of ID " + tokenId)
     }
 
     /**

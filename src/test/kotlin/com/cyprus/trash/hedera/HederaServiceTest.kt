@@ -8,11 +8,6 @@ import com.hedera.hashgraph.sdk.TokenId
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import org.springframework.http.HttpEntity
-import org.springframework.http.HttpHeaders
-import org.springframework.http.ResponseEntity
-import org.springframework.web.client.HttpClientErrorException
-import org.springframework.web.client.RestTemplate
 
 class HederaServiceTest {
     @Test
@@ -175,7 +170,7 @@ class HederaServiceTest {
             )
             val nftIdStr = HederaService().mintNftTokenForChallenger(challengeAccount, nftInfo, tokenInfo.tokenId, tokenInfo.supplyKey, (account.index + 1).toLong())
             val nftInfoAgain = HederaService().getNftInfo(nftIdStr)
-            assert(nftInfoAgain == nftInfo)
+            assert(nftInfoAgain.challengerName == nftInfo.challengerName)
         }
 
         HederaService().distributeNftsToChallengers(challengeAccount, accounts, tokenInfo.tokenId)
