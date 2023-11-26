@@ -1,7 +1,9 @@
 package com.cyprus.trash.service
 
 import com.cyprus.trash.model.Account
+import com.cyprus.trash.model.Nft
 import com.cyprus.trash.repo.AccountRepository
+import kotlinx.coroutines.flow.toList
 import org.springframework.stereotype.Service
 
 @Service
@@ -33,11 +35,19 @@ class AccountService(
         return accountRepository.get(email)
     }
 
+    suspend fun findAll(emails: List<String>): List<Account> {
+        return accountRepository.findAll(emails).toList()
+    }
+
     suspend fun increaseBalance(email: String, amount: Long, increase: Boolean = false): Boolean {
         return accountRepository.changeBalance(email, amount, true)
     }
 
     suspend fun decreaseBalance(email: String, amount: Long): Boolean {
         return accountRepository.changeBalance(email, amount, false)
+    }
+
+    suspend fun addNft(account: Account, nft: Nft): Boolean {
+        return accountRepository.addNft(account, nft)
     }
 }

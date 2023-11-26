@@ -14,5 +14,6 @@ data class Challenge(
     override val cryptoId: String = "",
     override val cryptoPrivateKey: String = "",
     val tokenId: String = "",
-    val supplyKey: String = ""
+    val supplyKey: String = "",
+    val participants: List<Participant> = listOf()
 ) : Transactionable

@@ -1,6 +1,9 @@
 package com.cyprus.trash.repo
 
 import com.cyprus.trash.model.Account
+import com.cyprus.trash.model.Nft
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.reactive.awaitFirst
 import kotlinx.coroutines.reactive.awaitFirstOrNull
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate
@@ -30,6 +33,31 @@ class AccountRepository(
                 )
             },
             Update().inc(Account::balance.name, if (increase) amount else -amount),
+            CLASS,
+            COLLECTION_NAME
+        ).awaitFirst().modifiedCount > 0
+    }
+
+    fun findAll(emails: List<String>): Flow<Account> {
+        return mongoTemplate.find(
+            Query().apply {
+                addCriteria(
+                    where(Account::email).`in`(emails)
+                )
+            },
+            CLASS,
+            COLLECTION_NAME
+        ).asFlow()
+    }
+
+    suspend fun addNft(account: Account, nft: Nft): Boolean {
+        return mongoTemplate.updateFirst(
+            Query().apply {
+                addCriteria(
+                    where(Account::email).isEqualTo(account.email)
+                )
+            },
+            Update().push(Account::nfts.name, nft),
             CLASS,
             COLLECTION_NAME
         ).awaitFirst().modifiedCount > 0

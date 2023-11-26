@@ -3,6 +3,7 @@ package com.cyprus.trash.service
 import com.cyprus.trash.api.model.TagDecision
 import com.cyprus.trash.model.Tag
 import com.cyprus.trash.model.TagStatus
+import com.cyprus.trash.model.TagType
 import com.cyprus.trash.repo.TagRepository
 import kotlinx.coroutines.flow.Flow
 import org.springframework.stereotype.Service
@@ -86,6 +87,10 @@ class TagService(
 
         return when (decision) {
             TagDecision.CONFIRM -> {
+                if (tag.type == TagType.CHALLENGE || tag.prize == 0L) {
+                    return tagRepository.saveDecision(tag.id, TagStatus.FINISHED)
+                }
+
                 val rs = hederaService.transferHBARs(tag, claimer, tag.prize)
                 require(rs == HederaService.TransactionResult.Ok)
 
