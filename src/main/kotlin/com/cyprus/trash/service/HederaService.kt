@@ -324,8 +324,17 @@ class HederaService {
         return NftTokenInfo(tokenId.toString(), supplyKey.toString())
     }
 
-    data class NftInformationToSave(val challengerName: String, val imageUrl: String)
-
+    /**
+     * Mint a non-fungible token (NFT) for a challenger.
+     *
+     * @param challenge The challenge object implementing the [Transactionable] interface.
+     * @param challengerName The name of the challenger.
+     * @param tokenIdStr The string representation of the token ID.
+     * @param supplyKeyStr The string representation of the supply key.
+     * @param serial The serial number of the NFT.
+     * @return The token ID of the created NFT as a string.
+     * @throws RuntimeException if the token creation fails.
+     */
     fun mintNftTokenForChallenger(
         challenge: Transactionable,
         challengerName: String,
@@ -376,10 +385,10 @@ class HederaService {
     }
 
     /**
-     * Retrieves the NFT information for the specified NFT ID.
+     * Retrieves the metadata of a non-fungible token (NFT) based on its ID.
      *
      * @param nftIdStr The string representation of the NFT ID.
-     * @return An instance of [NftInformationToSave] containing the NFT information.
+     * @return The metadata of the NFT as a string.
      */
     fun getNftInfo(nftIdStr: String): String {
         val nftId = NftId.fromString(nftIdStr)
@@ -391,7 +400,7 @@ class HederaService {
         return result
     }
 
-    fun transferNftToAccount(
+    private fun transferNftToAccount(
         treasuryAccountInfo: AccountInfo,
         receiverAccountInfo: AccountInfo,
         tokenId: TokenId,
