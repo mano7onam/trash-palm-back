@@ -162,23 +162,26 @@ class HederaServiceTest {
         val challengeAccount = HederaService().createNewAccount(10)!!
         val tokenInfo = HederaService().createNftTokenForChallenge(challengeAccount, "The Challenge", "TH")
 
-        val imageUrl = "https://shorturl.at/amHUW"
         for (account in accounts.withIndex()) {
-            val nftInfo = HederaService.NftInformationToSave(
-                "Challenger ${account.index}",
-                imageUrl
+            val challengerName = "Challenger ${account.index + 1}"
+            val nftIdStr = HederaService().mintNftTokenForChallenger(
+                challengeAccount,
+                challengerName,
+                tokenInfo.tokenId,
+                tokenInfo.supplyKey,
+                (account.index + 1).toLong()
             )
-            val nftIdStr = HederaService().mintNftTokenForChallenger(challengeAccount, nftInfo, tokenInfo.tokenId, tokenInfo.supplyKey, (account.index + 1).toLong())
             val nftInfoAgain = HederaService().getNftInfo(nftIdStr)
-            assert(nftInfoAgain.challengerName == nftInfo.challengerName)
+            assert(nftInfoAgain == challengerName)
         }
 
         HederaService().distributeNftsToChallengers(challengeAccount, accounts, tokenInfo.tokenId)
 
-        for (i in 1 .. accounts.size) {
+        for (i in 1..accounts.size) {
+            val challengerName = "Challenger $i"
             val nftIdStr = NftId(TokenId.fromString(tokenInfo.tokenId), i.toLong()).toString()
             val nftInfo = HederaService().getNftInfo(nftIdStr)
-            assert(nftInfo.imageUrl == imageUrl)
+            assert(nftInfo == challengerName)
         }
     }
 }

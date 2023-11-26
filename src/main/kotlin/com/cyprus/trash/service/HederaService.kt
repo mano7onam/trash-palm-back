@@ -328,7 +328,7 @@ class HederaService {
 
     fun mintNftTokenForChallenger(
         challenge: Transactionable,
-        nftInfo: NftInformationToSave,
+        challengerName: String,
         tokenIdStr: String,
         supplyKeyStr: String,
         serial: Long,
@@ -347,10 +347,7 @@ class HederaService {
                     .setMaxTransactionFee(Hbar(MAX_TRANSACTION_FEE.toLong()))
                     .setMaxAttempts(MAX_ATTEMPTS)
 
-                val gson = Gson()
-                val jsonString = gson.toJson(nftInfo)
-                val byteArray = jsonString.toByteArray(Charsets.UTF_8)
-                mintTx.addMetadata(byteArray)
+                mintTx.addMetadata(challengerName.toByteArray())
 
                 mintTx = mintTx.freezeWith(client)
 
@@ -384,16 +381,14 @@ class HederaService {
      * @param nftIdStr The string representation of the NFT ID.
      * @return An instance of [NftInformationToSave] containing the NFT information.
      */
-    fun getNftInfo(nftIdStr: String): NftInformationToSave {
+    fun getNftInfo(nftIdStr: String): String {
         val nftId = NftId.fromString(nftIdStr)
         val metadata = TokenNftInfoQuery()
             .setNftId(nftId)
             .execute(client)[0].metadata
-        val gson = Gson()
-        val jsonStringFromBytes = String(metadata, Charsets.UTF_8)
-        println("String from data $jsonStringFromBytes")
-        val nftInfo = gson.fromJson(jsonStringFromBytes, NftInformationToSave::class.java)
-        return nftInfo
+        val result = String(metadata, Charsets.UTF_8)
+        println("String from data $result")
+        return result
     }
 
     fun transferNftToAccount(
