@@ -9,8 +9,10 @@ data class Challenge(
     val description: String,
     val tagIds: List<String> = listOf(),
     val nfts: List<Nft> = listOf(),
-    val deadline: Instant = Instant.now(),
+    val deadlineSeconds: Long = Instant.now().epochSecond,
     val status: ChallengeStatus = ChallengeStatus.ACTIVE,
     override val cryptoId: String = "",
     override val cryptoPrivateKey: String = "",
+    val tokenId: String = "",
+    val supplyKey: String = ""
 ) : Transactionable

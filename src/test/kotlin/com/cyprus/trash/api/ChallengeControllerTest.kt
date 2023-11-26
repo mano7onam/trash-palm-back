@@ -5,6 +5,7 @@ import com.cyprus.trash.model.Challenge
 import com.cyprus.trash.model.Nft
 import com.cyprus.trash.repo.ChallengeRepository
 import com.cyprus.trash.service.ChallengeService
+import com.cyprus.trash.service.HederaService
 import kotlinx.coroutines.flow.flowOf
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -30,31 +31,53 @@ class ChallengeControllerTest {
     @MockBean
     private lateinit var challengeRepository: ChallengeRepository
 
+    @MockBean
+    private lateinit var hederaService: HederaService
+
     @Autowired
     private lateinit var webClient: WebTestClient
 
     private val challengeId = UUID.randomUUID().toString()
     private val tagId = UUID.randomUUID().toString()
     private val nftId = UUID.randomUUID().toString()
+    private val cryptoId = "id"
+    private val cryptoPrivateKey = "key"
+    private val tokenId = "tokenId"
+    private val supplyKey = "supplyKey"
     private val challenge = Challenge(
         id = challengeId,
         title = "supper challenge",
         description = "challenge some",
         tagIds = listOf(tagId),
-        nfts = listOf(
-            Nft(
-                id = nftId,
-                data = ByteArray(10),
-                value = 10
-            )
-        ),
-        deadline = Instant.now().plusSeconds(100_000).truncatedTo(ChronoUnit.SECONDS)
+        deadlineSeconds = Instant.now().plusSeconds(100_000).truncatedTo(ChronoUnit.SECONDS).epochSecond
     )
 
     @Test
     fun save() {
+        val accountInfo = HederaService.TransactionableImpl(cryptoId, cryptoPrivateKey)
+        val nftCreationKey = HederaService.NftTokenInfo(tokenId, supplyKey)
+
         challengeRepository.stub {
-            onBlocking { save(challenge) } doReturn challenge
+            onBlocking {
+                save(
+                    challenge.copy(
+                        cryptoId = accountInfo.cryptoId,
+                        cryptoPrivateKey = accountInfo.cryptoPrivateKey,
+                        tokenId = nftCreationKey.tokenId,
+                        supplyKey = nftCreationKey.supplyKey,
+                        nfts = challenge.nfts + Nft(
+                            id = nftId,
+                            value = 10
+                        )
+                    )
+                )
+            } doReturn challenge
+        }
+
+        hederaService.stub {
+            on { createNewAccount(0) } doReturn accountInfo
+            on { createNftTokenForChallenge(accountInfo, challenge.title, challenge.title.take(5)) } doReturn nftCreationKey
+            on { mintNftTokenForChallenger(accountInfo, "${challenge.title} 0", nftCreationKey.tokenId, nftCreationKey.supplyKey, 1) } doReturn nftId
         }
 
         webClient.post()

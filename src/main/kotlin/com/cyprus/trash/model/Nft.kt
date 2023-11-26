@@ -4,7 +4,6 @@ import org.springframework.data.annotation.Id
 
 data class Nft(
     @Id val id: String,
-    val data: ByteArray,
     val value: Long
 ) {
     override fun equals(other: Any?): Boolean {

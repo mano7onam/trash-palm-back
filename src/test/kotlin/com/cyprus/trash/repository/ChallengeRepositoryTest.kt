@@ -27,11 +27,10 @@ class ChallengeRepositoryTest : MongodbTestBase() {
             nfts = listOf(
                 Nft(
                     id = nftId,
-                    data = ByteArray(10),
                     value = 10
                 )
             ),
-            deadline = Instant.now().plusSeconds(100_000).truncatedTo(ChronoUnit.SECONDS)
+            deadlineSeconds = Instant.now().plusSeconds(100_000).truncatedTo(ChronoUnit.SECONDS).epochSecond
         )
 
         val repo = ChallengeRepository(template)
